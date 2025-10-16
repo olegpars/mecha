@@ -39,8 +39,10 @@
 
         // --- Глобальные переменные ---
         let scene, camera, renderer, controls, composer, clock;
-        let core, particles = [], lines;
+        let core, particles = [], lines, rings, runes = [], outerShell, dataTags = [];
         const PARTICLE_COUNT = 150;
+        const RUNE_COUNT = 40;
+        const DATA_TAG_COUNT = 30; // Количество пролетающих тегов данных
         const GRID_SIZE = 40;
         const GRID_STEP = 5;
         const CONNECTION_DISTANCE = 8;
@@ -126,8 +128,20 @@
             core = new THREE.Mesh(coreGeometry, coreMaterial);
             scene.add(core);
 
+            // Создание гироскопических колец
+            createRings();
+
             // Создание частиц
             createParticles();
+
+            // Создание рун
+            createRunes();
+
+            // Создание внешней оболочки
+            createOuterShell();
+
+            // Создание тегов данных
+            createDataTags();
 
             // Создание линий для соединений
             const lineMaterial = new THREE.LineBasicMaterial({
@@ -146,6 +160,160 @@
             window.addEventListener('resize', onWindowResize, false);
         }
         
+        // --- Создание гироскопических колец ---
+        function createRings() {
+            rings = new THREE.Group();
+            const ringMaterial = new THREE.MeshBasicMaterial({
+                color: 0x7DF9FF, // Более светлый, электрический синий
+                wireframe: true,
+                transparent: true,
+                opacity: 0.3
+            });
+
+            const ring1 = new THREE.Mesh(new THREE.TorusGeometry(8, 0.03, 16, 100), ringMaterial);
+            ring1.rotation.x = Math.PI / 2;
+
+            const ring2 = new THREE.Mesh(new THREE.TorusGeometry(10, 0.03, 16, 100), ringMaterial);
+            
+            const ring3 = new THREE.Mesh(new THREE.TorusGeometry(12, 0.03, 16, 100), ringMaterial);
+            ring3.rotation.y = Math.PI / 2;
+
+            rings.add(ring1, ring2, ring3);
+            scene.add(rings);
+        }
+
+        // --- Создание внешней оболочки ---
+        function createOuterShell() {
+            const shellGeometry = new THREE.IcosahedronGeometry(35, 1);
+            const shellMaterial = new THREE.MeshBasicMaterial({
+                color: 0x9400D3, // Глубокий фиолетовый
+                wireframe: true,
+                transparent: true,
+                opacity: 0.15
+            });
+            outerShell = new THREE.Mesh(shellGeometry, shellMaterial);
+            scene.add(outerShell);
+        }
+
+        // --- Создание тегов данных (ID-меток) ---
+        function createDataTags() {
+            for (let i = 0; i < DATA_TAG_COUNT; i++) {
+                const tagString = generateDataTagString();
+                const texture = createDataTagTexture(tagString);
+
+                const material = new THREE.SpriteMaterial({
+                    map: texture,
+                    color: 0x39FF14, // Кибер-зеленый
+                    blending: THREE.AdditiveBlending,
+                    transparent: true,
+                    opacity: 0,
+                    depthWrite: false
+                });
+
+                const sprite = new THREE.Sprite(material);
+                // Делаем их более вытянутыми, как строки текста
+                sprite.scale.set(3, 1.5, 1);
+
+                const tag = {
+                    sprite: sprite,
+                    particleIndex: Math.floor(Math.random() * PARTICLE_COUNT),
+                    state: 'hidden', // hidden, fadingIn, visible, fadingOut
+                    timer: Math.random() * 7, // Начальная случайная задержка
+                    lifespan: Math.random() * 3 + 2, // от 2 до 5 секунд
+                    maxOpacity: Math.random() * 0.4 + 0.4 // от 0.4 до 0.8
+                };
+                
+                dataTags.push(tag);
+                scene.add(sprite);
+            }
+        }
+
+        // --- Генерация строки для тега данных ---
+        function generateDataTagString() {
+            const chars = 'ABCDEF0123456789';
+            const prefixes = ['ID:', 'SYS:', 'REG:', 'SEC:', 'DAT:'];
+            let result = prefixes[Math.floor(Math.random() * prefixes.length)];
+            for (let i = 0; i < 8; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+                if (i === 3) result += '-';
+            }
+            return result;
+        }
+        
+        // --- Создание текстуры для тега данных ---
+        function createDataTagTexture(text) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 128;
+            const context = canvas.getContext('2d');
+            context.fillStyle = 'rgba(255, 255, 255, 1)';
+            context.font = 'bold 32px "Courier New", monospace'; // Моноширинный шрифт для вида "кода"
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, 128, 64);
+            return new THREE.CanvasTexture(canvas);
+        }
+        
+        // --- Перепривязка тега данных к новой частице ---
+        function resetDataTag(tag) {
+            tag.particleIndex = Math.floor(Math.random() * PARTICLE_COUNT);
+            tag.state = 'hidden';
+            tag.timer = Math.random() * 5 + 2; // Время до следующего появления
+        }
+
+
+        // --- Создание неоновых рун ---
+        function createRunes() {
+            const runeChars = ['ア', 'イ', 'カ', 'キ', 'ク', 'セ', 'ソ', 'タ', 'チ', 'ツ', 'テ', 'ト', 'ノ', 'ハ'];
+            for (let i = 0; i < RUNE_COUNT; i++) {
+                const char = runeChars[Math.floor(Math.random() * runeChars.length)];
+                const texture = createRuneTexture(char);
+                
+                const material = new THREE.SpriteMaterial({
+                    map: texture,
+                    color: 0x99FFFF, // Яркий неоновый циан
+                    blending: THREE.AdditiveBlending,
+                    transparent: true,
+                    opacity: 0,
+                    depthWrite: false
+                });
+
+                const sprite = new THREE.Sprite(material);
+                
+                const rune = {
+                    sprite: sprite,
+                    state: 'hidden', // hidden, fadingIn, visible, fadingOut
+                    timer: Math.random() * 5,
+                    lifespan: Math.random() * 2 + 1,
+                    maxOpacity: Math.random() * 0.5 + 0.3
+                };
+
+                const radius = 15 + Math.random() * 15;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos((Math.random() * 2) - 1);
+                
+                sprite.position.setFromSphericalCoords(radius, phi, theta);
+                sprite.scale.set(1.5, 1.5, 1.5);
+                
+                runes.push(rune);
+                scene.add(sprite);
+            }
+        }
+
+        // --- Вспомогательная функция для текстур рун ---
+        function createRuneTexture(character) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const context = canvas.getContext('2d');
+            context.fillStyle = 'rgba(255, 255, 255, 1)';
+            context.font = 'bold 96px "Inter", sans-serif';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(character, 64, 64);
+            return new THREE.CanvasTexture(canvas);
+        }
+
         // --- Создание частиц ---
         function createParticles() {
             const circleTexture = createParticleTexture('circle');
@@ -258,6 +426,103 @@
             core.rotation.x += 0.001;
             core.rotation.y += 0.002;
             
+            // Вращение внешней оболочки
+            if (outerShell) {
+                outerShell.rotation.y -= 0.0003;
+                outerShell.rotation.x -= 0.0002;
+            }
+
+            // Вращение колец в стиле "Сферы Дайсона"
+            if (rings) {
+                // Медленное, сложное вращение всей группы для эффекта прецессии
+                rings.rotation.y += 0.0005;
+                rings.rotation.x = Math.sin(time * 0.2) * 0.3;
+                rings.rotation.z = Math.cos(time * 0.2) * 0.3;
+
+                // Индивидуальное вращение каждого кольца
+                rings.children[0].rotation.z -= 0.005;
+                rings.children[1].rotation.y += 0.003;
+                rings.children[2].rotation.x -= 0.004;
+            }
+
+            // Обновление тегов данных
+            dataTags.forEach(tag => {
+                // Обновляем позицию тега, чтобы он следовал за частицей
+                if (particles[tag.particleIndex]) { // Проверяем, что частица существует
+                    const targetParticle = particles[tag.particleIndex];
+                    tag.sprite.position.copy(targetParticle.sprite.position);
+                    tag.sprite.position.y += 0.8; // Сдвиг вверх, чтобы было над частицей
+                }
+
+                const spriteMaterial = tag.sprite.material;
+
+                switch (tag.state) {
+                    case 'hidden':
+                        tag.timer -= delta;
+                        if (tag.timer <= 0) {
+                            tag.state = 'fadingIn';
+                        }
+                        break;
+                    case 'fadingIn':
+                        spriteMaterial.opacity += delta * 0.8;
+                        if (spriteMaterial.opacity >= tag.maxOpacity) {
+                            spriteMaterial.opacity = tag.maxOpacity;
+                            tag.state = 'visible';
+                            tag.timer = tag.lifespan;
+                        }
+                        break;
+                    case 'visible':
+                        tag.timer -= delta;
+                        if (tag.timer <= 0) {
+                            tag.state = 'fadingOut';
+                        }
+                        break;
+                    case 'fadingOut':
+                        spriteMaterial.opacity -= delta * 0.8;
+                        if (spriteMaterial.opacity <= 0) {
+                            spriteMaterial.opacity = 0;
+                            resetDataTag(tag); // Перепривязываем к новой частице
+                        }
+                        break;
+                }
+            });
+
+            // Обновление рун
+            runes.forEach(rune => {
+                const spriteMaterial = rune.sprite.material;
+
+                switch (rune.state) {
+                    case 'hidden':
+                        rune.timer -= delta;
+                        if (rune.timer <= 0) {
+                            rune.state = 'fadingIn';
+                        }
+                        break;
+                    case 'fadingIn':
+                        spriteMaterial.opacity += delta * 0.5;
+                        if (spriteMaterial.opacity >= rune.maxOpacity) {
+                            spriteMaterial.opacity = rune.maxOpacity;
+                            rune.state = 'visible';
+                            rune.timer = rune.lifespan;
+                        }
+                        break;
+                    case 'visible':
+                        rune.timer -= delta;
+                        if (rune.timer <= 0) {
+                            rune.state = 'fadingOut';
+                        }
+                        break;
+                    case 'fadingOut':
+                        spriteMaterial.opacity -= delta * 0.5;
+                        if (spriteMaterial.opacity <= 0) {
+                            spriteMaterial.opacity = 0;
+                            rune.state = 'hidden';
+                            rune.timer = Math.random() * 5 + 2; // Время до следующего появления
+                        }
+                        break;
+                }
+            });
+
             // Обновление частиц
             particles.forEach(p => {
                 p.position.lerp(p.target, p.speed);
@@ -298,3 +563,9 @@
     </script>
 </body>
 </html>
+
+
+
+
+
+
